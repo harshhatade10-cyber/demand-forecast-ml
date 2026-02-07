@@ -1,0 +1,28 @@
+{
+  "training_date": "2026-02-07T18:44:08.175905",
+  "model_type": "Hybrid LSTM + XGBoost",
+  "lstm_params": {
+    "lstm_units": 64,
+    "dropout": 0.2,
+    "epochs": 20,
+    "batch_size": 32,
+    "validation_split": 0.1,
+    "early_stopping_patience": 3,
+    "time_steps": 24
+  },
+  "xgb_params": {
+    "n_estimators": 300,
+    "learning_rate": 0.05,
+    "max_depth": 6,
+    "subsample": 0.8,
+    "random_state": 42,
+    "verbosity": 0
+  },
+  "metrics": {
+    "mae": 5.946308612823486,
+    "rmse": 6.954046089798584,
+    "r2": 0.8737410306930542,
+    "mape": 0.15404225885868073,
+    "n_samples": 404
+  }
+}
