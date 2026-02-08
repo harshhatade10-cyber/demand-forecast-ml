@@ -1,0 +1,14 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+
+# Git
+.git
+.gitignore
+
+# Logs & misc
+*.log
+.ipynb_checkpoints
