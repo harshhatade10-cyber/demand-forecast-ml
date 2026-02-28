@@ -1,116 +1,154 @@
 """
-Generate synthetic ride demand dataset for demand forecasting.
-Creates hourly demand data across multiple areas with realistic patterns.
+Advanced synthetic ride demand dataset for multi-city forecasting.
+Includes city-level, area-level, peak-hour, and weekend behavior.
 """
 
 import os
 import pandas as pd
 import numpy as np
-from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
-# Configuration constants
+# ================= CONFIG =================
+
 RANDOM_SEED = 42
 START_DATE = "2023-01-01"
 END_DATE = "2023-03-31"
-FREQUENCY = "h"  # lowercase 'h' for pandas 2.0+ compatibility (hourly)
+FREQUENCY = "h"
+
 BASE_FARE_MIN = 50
 BASE_FARE_MAX = 150
+
 BASE_DEMAND = 20
 PEAK_MORNING_DEMAND = 30
 PEAK_EVENING_DEMAND = 40
-AREA_DEMAND_MULTIPLIER = 5
-DEMAND_NOISE_MIN = -10
-DEMAND_NOISE_MAX = 10
+
+DEMAND_NOISE_MIN = -8
+DEMAND_NOISE_MAX = 8
+
 OUTPUT_PATH = "data/ride_demand_data.csv"
 
-# Area mapping
-AREAS: Dict[int, str] = {
-    1: "Sitabuldi",
-    2: "Dharampeth",
-    3: "Civi_lines",
-    4: "IT_Park",
-    5: "Sadar",
-    6: "Railway_Station"
+# ================= CITY + AREA =================
+
+CITIES: Dict[str, List[str]] = {
+    "Nagpur": ["Sitabuldi", "Dharampeth", "Civil_Lines", "IT_Park"],
+    "Pune": ["Baner", "Hinjewadi", "Kothrud", "Viman_Nagar"],
+    "Mumbai": ["Andheri", "Bandra", "Dadar", "Powai"],
+    "Amravati": ["Rajapeth", "Camp", "Badnera", "Irwin"]
 }
 
+# City level multiplier
+CITY_MULTIPLIER = {
+    "Nagpur": 1.0,
+    "Pune": 1.6,
+    "Mumbai": 2.5,
+    "Amravati": 0.8
+}
+
+# Area level multiplier
+AREA_MULTIPLIER = {
+    "Sitabuldi": 10,
+    "Dharampeth": 6,
+    "Civil_Lines": 8,
+    "IT_Park": 18,
+
+    "Baner": 12,
+    "Hinjewadi": 22,
+    "Kothrud": 9,
+    "Viman_Nagar": 14,
+
+    "Andheri": 28,
+    "Bandra": 22,
+    "Dadar": 18,
+    "Powai": 24,
+
+    "Rajapeth": 6,
+    "Camp": 4,
+    "Badnera": 3,
+    "Irwin": 5
+}
+
+# Area type behavior
+IT_AREAS = ["IT_Park", "Hinjewadi", "Powai"]
+BUSINESS_AREAS = ["Sitabuldi", "Andheri", "Bandra", "Baner"]
+RESIDENTIAL_AREAS = ["Kothrud", "Civil_Lines", "Rajapeth", "Badnera"]
+
+# ================= GENERATE =================
 
 def generate_dataset() -> pd.DataFrame:
-    """
-    Generate synthetic ride demand dataset with realistic hourly patterns.
-    
-    Returns:
-        pd.DataFrame: DataFrame with columns: datetime, area_id, base_fare, 
-                     area_name, hour, day, ride_demand
-    """
-    # Set seed for reproducibility
+
     np.random.seed(RANDOM_SEED)
-    
-    # Generate date range
+
     dates = pd.date_range(start=START_DATE, end=END_DATE, freq=FREQUENCY)
-    
-    # Create base DataFrame
-    area_ids = np.random.choice(list(AREAS.keys()), len(dates))
-    base_fares = np.random.randint(BASE_FARE_MIN, BASE_FARE_MAX + 1, len(dates))
-    
-    df = pd.DataFrame({
-        "datetime": dates,
-        "area_id": area_ids,
-        "base_fare": base_fares,
-    })
-    
-    # Add derived features
-    df["area_name"] = df["area_id"].map(AREAS)
-    df["hour"] = df["datetime"].dt.hour
-    df["day"] = df["datetime"].dt.dayofweek
-    
-    # Calculate ride demand with realistic patterns
-    morning_peak = df["hour"].between(8, 10).astype(int)  # 8-10 AM
-    evening_peak = df["hour"].between(17, 20).astype(int)  # 5-8 PM
-    random_noise = np.random.randint(DEMAND_NOISE_MIN, DEMAND_NOISE_MAX + 1, len(df))
-    
-    df["ride_demand"] = (
-        BASE_DEMAND
-        + (morning_peak * PEAK_MORNING_DEMAND)
-        + (evening_peak * PEAK_EVENING_DEMAND)
-        + (df["area_id"] * AREA_DEMAND_MULTIPLIER)
-        + random_noise
-    ).astype(int)
-    
+
+    rows = []
+
+    for city, areas in CITIES.items():
+        for area in areas:
+            for dt in dates:
+
+                hour = dt.hour
+                day = dt.dayofweek
+                month = dt.month
+                weekend = 1 if day >= 5 else 0
+
+                base_fare = np.random.randint(BASE_FARE_MIN, BASE_FARE_MAX + 1)
+
+                # Peak hours
+                morning_peak = 1 if 8 <= hour <= 10 else 0
+                evening_peak = 1 if 17 <= hour <= 20 else 0
+
+                # Weekend boost
+                weekend_boost = 15 if weekend else 0
+
+                # IT weekday boost
+                it_boost = 20 if (area in IT_AREAS and not weekend and 9 <= hour <= 18) else 0
+
+                # Business morning boost
+                business_boost = 15 if (area in BUSINESS_AREAS and 8 <= hour <= 11) else 0
+
+                # Residential evening boost
+                residential_boost = 18 if (area in RESIDENTIAL_AREAS and 18 <= hour <= 22) else 0
+
+                random_noise = np.random.randint(DEMAND_NOISE_MIN, DEMAND_NOISE_MAX + 1)
+
+                ride_demand = (
+                    BASE_DEMAND
+                    + (morning_peak * PEAK_MORNING_DEMAND)
+                    + (evening_peak * PEAK_EVENING_DEMAND)
+                    + (CITY_MULTIPLIER[city] * 20)
+                    + AREA_MULTIPLIER[area]
+                    + weekend_boost
+                    + it_boost
+                    + business_boost
+                    + residential_boost
+                    + random_noise
+                )
+
+                rows.append({
+                    "datetime": dt,
+                    "city": city,
+                    "area_name": area,
+                    "location": f"{city}_{area}",
+                    "hour": hour,
+                    "day_of_week": day,
+                    "month": month,
+                    "base_fare": base_fare,
+                    "ride_demand": int(max(0, ride_demand))
+                })
+
+    df = pd.DataFrame(rows)
     return df
 
 
 def save_dataset(df: pd.DataFrame, output_path: str = OUTPUT_PATH) -> None:
-    """
-    Save DataFrame to CSV with error handling.
-    
-    Args:
-        df: DataFrame to save
-        output_path: Path where CSV will be saved
-        
-    Raises:
-        IOError: If directory doesn't exist or file write fails
-    """
-    try:
-        # Create output directory if it doesn't exist
-        output_dir = os.path.dirname(output_path)
-        if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir, exist_ok=True)
-        
-        # Save to CSV
-        df.to_csv(output_path, index=False)
-        print(f"✓ Dataset successfully generated and saved to: {output_path}")
-        print(f"✓ Dataset shape: {df.shape[0]} rows × {df.shape[1]} columns")
-        
-    except IOError as e:
-        print(f"✗ Error saving dataset: {e}")
-        raise
-    except Exception as e:
-        print(f"✗ Unexpected error: {e}")
-        raise
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    df.to_csv(output_path, index=False)
+
+    print(f"✓ Dataset saved to: {output_path}")
+    print(f"✓ Shape: {df.shape}")
 
 
 if __name__ == "__main__":
-    # Generate and save dataset
     dataset = generate_dataset()
     save_dataset(dataset)

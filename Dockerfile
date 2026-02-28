@@ -2,18 +2,24 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# system deps
 RUN apt-get update && apt-get install -y build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+RUN pip install --upgrade pip setuptools wheel
 
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ backend/
 COPY data/ data/
 COPY models/ models/
+COPY src/ src/
+
+# 🔥 TRAIN MODEL DURING BUILD
+RUN python data/generate_dataset.py && \
+    python src/preprocess.py && \
+    python src/train_model.py
 
 EXPOSE 5000
 
-CMD ["python", "backend/app.py"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "backend.app:app"]

@@ -37,7 +37,7 @@ DATA_DIR = "data/processed"
 MODEL_DIR = "models"
 LOG_FILE = f"{MODEL_DIR}/training.log"
 
-LSTM_MODEL_PATH = f"{MODEL_DIR}/lstm_model.h5"
+LSTM_MODEL_PATH = f"{MODEL_DIR}/lstm_model.keras"
 SCALER_PATH = f"{MODEL_DIR}/scaler.pkl"
 XGB_MODEL_PATH = f"{MODEL_DIR}/xgb_model.pkl"
 HYBRID_MODEL_PATH = f"{MODEL_DIR}/hybrid_model.pkl"

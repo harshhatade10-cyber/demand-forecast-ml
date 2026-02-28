@@ -1,170 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Ride Demand Forecast</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8" />
+<title>Smart Ride Demand Forecast</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Small UI animations -->
-  <style>
-    .fade-in {
-      animation: fadeIn 0.35s ease-in-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-  </style>
+<style>
+  body {
+    background: linear-gradient(-45deg, #4f46e5, #9333ea, #ec4899, #6366f1);
+    background-size: 400% 400%;
+    animation: gradientBG 12s ease infinite;
+  }
+
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .glass-card {
+    backdrop-filter: blur(18px);
+    background: rgba(255,255,255,0.92);
+  }
+
+  .fade-in {
+    animation: fadeIn 0.4s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
 </head>
 
-<body class="bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600 min-h-screen flex items-center justify-center px-4">
+<body class="min-h-screen flex items-center justify-center px-4">
 
-  <!-- Main Card -->
-  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 w-full max-w-sm fade-in">
+<div class="glass-card rounded-3xl p-8 w-full max-w-md transition-all duration-500">
 
-    <!-- Header -->
-    <div class="text-center mb-6">
-      <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
-        🚕 Ride Demand Forecast
-      </h1>
-      <p class="text-xs text-gray-500 mt-1">
-        AI-powered area-wise prediction
-      </p>
-    </div>
+  <div class="text-center mb-6">
+    <h1 class="text-3xl font-extrabold text-indigo-600">
+      🚕 Smart Ride Forecast
+    </h1>
+    <p class="text-sm text-gray-500 mt-1">
+      Multi-City AI Demand Prediction
+    </p>
+  </div>
 
-    <!-- Area Select -->
-    <div class="mb-5">
-      <label class="block mb-2 text-sm font-semibold text-gray-700">
-        Select Area
-      </label>
-      <select
-        id="areaSelect"
-        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700
-               focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-      </select>
-    </div>
+  <div class="mb-4">
+    <label class="block text-sm font-semibold mb-1">Select City</label>
+    <select id="citySelect"
+      class="w-full border rounded-xl px-3 py-2
+             transition-all duration-300
+             hover:scale-105 hover:shadow-xl
+             focus:ring-2 focus:outline-none">
+    </select>
+  </div>
 
-    <!-- Predict Button -->
-    <button
-      onclick="predictDemand()"
-      class="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold
-             hover:bg-indigo-700 active:scale-[0.98] transition">
-      Predict Demand
-    </button>
+  <div class="mb-4">
+    <label class="block text-sm font-semibold mb-1">Select Area</label>
+    <select id="areaSelect"
+      class="w-full border rounded-xl px-3 py-2
+             transition-all duration-300
+             hover:scale-105 hover:shadow-xl
+             focus:ring-2 focus:outline-none">
+    </select>
+  </div>
 
-    <!-- Loading -->
-    <p id="loadingText"
-       class="text-center text-sm text-gray-500 mt-3 hidden">
-      Predicting demand...
+  <button onclick="predictDemand()"
+    class="w-full bg-gradient-to-r from-indigo-600 to-purple-600
+           text-white font-semibold py-2 rounded-xl
+           transition-all duration-300
+           hover:scale-105 hover:shadow-2xl">
+    Predict Demand
+  </button>
+
+  <p id="loadingText" class="text-center text-sm text-gray-500 mt-3 hidden">
+    Analyzing demand...
+  </p>
+
+  <div id="result"
+       class="mt-6 text-center hidden fade-in bg-indigo-50 rounded-2xl p-4 shadow-inner">
+
+    <p class="text-xs uppercase text-gray-500 tracking-wide">
+      Predicted Demand
     </p>
 
-    <!-- Result -->
-    <div id="result" class="mt-6 text-center hidden fade-in">
-      <p class="text-xs uppercase tracking-wide text-gray-500">
-        Predicted Demand
-      </p>
+    <p id="demandValue"
+       class="text-4xl font-bold mt-1 text-indigo-600">0</p>
 
-      <p id="demandValue"
-         class="text-3xl font-bold text-indigo-600 mt-1">
-      </p>
+    <p id="demandLevel"
+       class="text-sm font-semibold mt-2"></p>
 
-      <p id="timeValue"
-         class="text-xs text-gray-500 mt-2">
-      </p>
-    </div>
+    <p id="timeValue"
+       class="text-xs text-gray-500 mt-2"></p>
+
+    <canvas id="trendChart" class="mt-4"></canvas>
 
   </div>
 
+</div>
+
 <script>
-async function loadAreas() {
-  try {
-    const res = await fetch("/areas");
-    const data = await res.json();
+let locationsMap = {};
+let chart;
 
-    if (data.error) {
-      console.error("Error:", data.error);
-      return;
+const cityThemes = {
+  "Nagpur": "orange",
+  "Pune": "purple",
+  "Mumbai": "blue",
+  "Amravati": "green"
+};
+
+async function loadLocations() {
+  const res = await fetch("/locations");
+  const data = await res.json();
+
+  data.locations.forEach(loc => {
+    const [city, ...areaParts] = loc.split("_");
+    const area = areaParts.join("_");
+
+    if (!locationsMap[city]) locationsMap[city] = [];
+    locationsMap[city].push(area);
+  });
+
+  populateCities();
+}
+
+function populateCities() {
+  const citySelect = document.getElementById("citySelect");
+  citySelect.innerHTML = "";
+
+  Object.keys(locationsMap).forEach(city => {
+    const opt = document.createElement("option");
+    opt.value = city;
+    opt.textContent = city;
+    citySelect.appendChild(opt);
+  });
+
+  populateAreas();
+}
+
+function populateAreas() {
+  const city = document.getElementById("citySelect").value;
+  const areaSelect = document.getElementById("areaSelect");
+  areaSelect.innerHTML = "";
+
+  locationsMap[city].forEach(area => {
+    const opt = document.createElement("option");
+    opt.value = area;
+    opt.textContent = area;
+    areaSelect.appendChild(opt);
+  });
+
+  applyTheme(city);
+}
+
+function applyTheme(city) {
+  const color = cityThemes[city] || "indigo";
+  document.getElementById("demandValue").className =
+    "text-4xl font-bold mt-1 text-" + color + "-600";
+}
+
+document.getElementById("citySelect").addEventListener("change", populateAreas);
+
+function animateNumber(finalValue) {
+  let start = 0;
+  const duration = 800;
+  const stepTime = 20;
+  const increment = finalValue / (duration / stepTime);
+
+  const counter = setInterval(() => {
+    start += increment;
+    if (start >= finalValue) {
+      start = finalValue;
+      clearInterval(counter);
     }
+    document.getElementById("demandValue").innerText =
+      Math.floor(start) + " rides";
+  }, stepTime);
+}
 
-    const select = document.getElementById("areaSelect");
-    select.innerHTML = "";
+function setDemandLevel(value) {
+  const el = document.getElementById("demandLevel");
 
-    if (data.areas && Array.isArray(data.areas)) {
-      data.areas.forEach(area => {
-        const opt = document.createElement("option");
-        opt.value = area;
-        opt.textContent = area;
-        select.appendChild(opt);
-      });
-    }
-  } catch (err) {
-    console.error("Failed to load areas:", err);
+  if (value > 70) {
+    el.innerText = "🔥 High Demand";
+    el.className = "text-red-600 font-semibold";
+  } else if (value > 40) {
+    el.innerText = "⚖ Medium Demand";
+    el.className = "text-yellow-600 font-semibold";
+  } else {
+    el.innerText = "📉 Low Demand";
+    el.className = "text-green-600 font-semibold";
   }
 }
 
+function drawChart(baseValue) {
+  const ctx = document.getElementById("trendChart");
+
+  const data = Array.from({length: 24}, (_, i) =>
+    Math.round(baseValue + Math.sin(i/3) * 5 + Math.random() * 3)
+  );
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: Array.from({length: 24}, (_, i) => i + ":00"),
+      datasets: [{
+        data: data,
+        tension: 0.4,
+        borderWidth: 3,
+        fill: true,
+        pointRadius: 4,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+
+        tooltip: {
+          backgroundColor: "rgba(17,24,39,0.95)",   // dark premium bg
+          titleColor: "#fff",
+          bodyColor: "#fff",
+          padding: 12,
+          cornerRadius: 12,
+          displayColors: false,
+          callbacks: {
+            title: function(context) {
+              return "🕒 Hour: " + context[0].label;
+            },
+            label: function(context) {
+              return "🚕 Demand: " + context.parsed.y + " rides";
+            }
+          }
+        }
+      },
+
+      scales: {
+        x: { display: false },
+        y: { display: false }
+      }
+    }
+  });
+}
+
 async function predictDemand() {
+  const city = document.getElementById("citySelect").value;
   const area = document.getElementById("areaSelect").value;
-  if (!area) {
-    alert("Please select an area");
-    return;
-  }
 
   const resultDiv = document.getElementById("result");
-  const demandValue = document.getElementById("demandValue");
   const timeValue = document.getElementById("timeValue");
   const loadingText = document.getElementById("loadingText");
 
   resultDiv.classList.add("hidden");
   loadingText.classList.remove("hidden");
 
-  try {
-    const res = await fetch("/predict", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        area: area,
-        base_fare: 100
-      })
-    });
+  const res = await fetch("/predict", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ city, area, base_fare: 100 })
+  });
 
-    const data = await res.json();
+  const data = await res.json();
 
-    loadingText.classList.add("hidden");
-    resultDiv.classList.remove("hidden");
+  loadingText.classList.add("hidden");
+  resultDiv.classList.remove("hidden");
 
-    timeValue.innerText = "";
-
-    if (data.error) {
-      demandValue.innerText = "Error";
-      demandValue.className = "text-lg font-semibold text-red-600";
-      console.error("Prediction error:", data.error);
-
-    } else if (data.predicted_demand !== undefined) {
-      demandValue.innerText = data.predicted_demand + " rides";
-      demandValue.className = "text-3xl font-bold text-indigo-600";
-
-      if (data.time) {
-        timeValue.innerText = "As of: " + data.time;
-      }
-
-    } else {
-      demandValue.innerText = "No prediction";
-      demandValue.className = "text-lg font-semibold text-red-600";
-    }
-
-  } catch (err) {
-    console.error("Prediction failed:", err);
-    loadingText.classList.add("hidden");
-    resultDiv.classList.remove("hidden");
-    demandValue.innerText = "Server error";
-    demandValue.className = "text-lg font-semibold text-red-600";
+  if (data.predicted_demand !== undefined) {
+    animateNumber(data.predicted_demand);
+    setDemandLevel(data.predicted_demand);
+    drawChart(data.predicted_demand);
+    timeValue.innerText = "As of: " + data.time;
   }
 }
 
-loadAreas();
+loadLocations();
 </script>
 
 </body>
