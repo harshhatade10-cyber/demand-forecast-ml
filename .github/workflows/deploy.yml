@@ -24,3 +24,6 @@ jobs:
 
       - name: Push to Docker Hub
         run: docker push harshhatade/ride-ai-app:latest
+        
+      - name: Trigger Render Deploy
+        run: curl -X POST "https://api.render.com/deploy/srv-d6hcsnlm5p6s73bh7asg?key=XkY-_1D0MQI"
