@@ -1,288 +1,332 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Smart Ride Demand Forecast</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8">
+<title>Ride AI Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdn.tailwindcss.com"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-  body {
-    background: linear-gradient(-45deg, #4f46e5, #9333ea, #ec4899, #6366f1);
-    background-size: 400% 400%;
-    animation: gradientBG 12s ease infinite;
-  }
 
-  @keyframes gradientBG {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
+/* ===== BACKGROUND ===== */
+body {
+  background: #020617;
+  color: white;
+}
 
-  .glass-card {
-    backdrop-filter: blur(18px);
-    background: rgba(255,255,255,0.92);
-  }
+body::before {
+  content: "";
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 20% 20%, rgba(168,85,247,0.08), transparent 40%);
+  z-index: -1;
+}
 
-  .fade-in {
-    animation: fadeIn 0.4s ease-in-out;
-  }
+/* ===== GLASS ===== */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(168,85,247,0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+.glass:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 0 30px rgba(168,85,247,0.2);
+}
+
+.active {
+  border: 1px solid rgba(168,85,247,0.6);
+  box-shadow: 0 0 20px rgba(168,85,247,0.4);
+}
+
 </style>
+
 </head>
 
-<body class="min-h-screen flex items-center justify-center px-4">
+<body class="flex">
 
-<div class="glass-card rounded-3xl p-8 w-full max-w-md transition-all duration-500">
+<!-- Sidebar -->
 
-  <div class="text-center mb-6">
-    <h1 class="text-3xl font-extrabold text-indigo-600">
-      🚕 Smart Ride Forecast
-    </h1>
-    <p class="text-sm text-gray-500 mt-1">
-      Multi-City AI Demand Prediction
-    </p>
-  </div>
+<div class="w-64 bg-black/80 p-6 space-y-6 border-r border-purple-900">
+<h1 class="text-2xl font-bold text-purple-300">🚕 Ride AI</h1>
 
-  <div class="mb-4">
-    <label class="block text-sm font-semibold mb-1">Select City</label>
-    <select id="citySelect"
-      class="w-full border rounded-xl px-3 py-2
-             transition-all duration-300
-             hover:scale-105 hover:shadow-xl
-             focus:ring-2 focus:outline-none">
-    </select>
-  </div>
+<button onclick="show('dashboard')" class="block hover:text-purple-300">Dashboard</button> <button onclick="show('prediction')" class="block hover:text-purple-300">Prediction</button> <button onclick="show('analytics')" class="block hover:text-purple-300">Analytics</button>
 
-  <div class="mb-4">
-    <label class="block text-sm font-semibold mb-1">Select Area</label>
-    <select id="areaSelect"
-      class="w-full border rounded-xl px-3 py-2
-             transition-all duration-300
-             hover:scale-105 hover:shadow-xl
-             focus:ring-2 focus:outline-none">
-    </select>
-  </div>
+</div>
 
-  <button onclick="predictDemand()"
-    class="w-full bg-gradient-to-r from-indigo-600 to-purple-600
-           text-white font-semibold py-2 rounded-xl
-           transition-all duration-300
-           hover:scale-105 hover:shadow-2xl">
-    Predict Demand
-  </button>
+<!-- Main -->
 
-  <p id="loadingText" class="text-center text-sm text-gray-500 mt-3 hidden">
-    Analyzing demand...
-  </p>
+<div class="flex-1 p-8">
 
-  <div id="result"
-       class="mt-6 text-center hidden fade-in bg-indigo-50 rounded-2xl p-4 shadow-inner">
+<!-- DASHBOARD -->
 
-    <p class="text-xs uppercase text-gray-500 tracking-wide">
-      Predicted Demand
-    </p>
+<div id="dashboard">
+<h1 class="text-3xl font-bold mb-6 text-purple-300">🚀 Smart Demand Overview</h1>
 
-    <p id="demandValue"
-       class="text-4xl font-bold mt-1 text-indigo-600">0</p>
+<div class="grid grid-cols-3 gap-6 mb-6">
+<div class="glass p-6 text-center">
+<p>Active Cities</p>
+<h2 class="text-2xl text-purple-300">4+</h2>
+</div>
 
-    <p id="demandLevel"
-       class="text-sm font-semibold mt-2"></p>
+<div class="glass p-6 text-center">
+<p>Peak Hour</p>
+<h2 class="text-2xl text-purple-300">18:00</h2>
+</div>
 
-    <p id="timeValue"
-       class="text-xs text-gray-500 mt-2"></p>
+<div class="glass p-6 text-center">
+<p>Status</p>
+<h2 class="text-2xl text-purple-300">Live</h2>
+</div>
+</div>
 
-    <canvas id="trendChart" class="mt-4"></canvas>
+<div class="h-64 glass p-4">
+<canvas id="dashChart"></canvas>
+</div>
 
-  </div>
+</div>
+
+<!-- PREDICTION -->
+
+<div id="prediction" class="hidden">
+
+<h1 class="text-2xl mb-4">Select City</h1>
+<div id="cities" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+
+<h1 class="text-2xl mb-4">Select Area</h1>
+<div id="areas" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 hidden"></div>
+
+<div id="result" class="hidden mt-8 p-8 glass text-center border border-purple-400">
+<h2 id="value" class="text-6xl text-purple-300 font-bold"></h2>
+<p id="level"></p>
+
+<div class="mt-4 h-64">
+<canvas id="chartCanvas"></canvas>
+</div>
+
+</div>
+
+</div>
+
+<!-- ANALYTICS -->
+
+<div id="analytics" class="hidden">
+
+<!-- Pie -->
+
+<div class="flex justify-center">
+<div class="glass p-4 w-96 text-center">
+<h2 class="mb-2">City Share</h2>
+<canvas id="pie"></canvas>
+</div>
+</div>
+
+<!-- Bottom -->
+
+<div class="grid grid-cols-2 gap-6 mt-6">
+
+<div class="glass p-4">
+<h2>Demand Comparison</h2>
+<canvas id="bar"></canvas>
+</div>
+
+<div class="glass p-4">
+<h2>24h Trend</h2>
+<canvas id="line"></canvas>
+</div>
+
+</div>
+
+</div>
 
 </div>
 
 <script>
-let locationsMap = {};
-let chart;
 
-const cityThemes = {
-  "Nagpur": "orange",
-  "Pune": "purple",
-  "Mumbai": "blue",
-  "Amravati": "green"
+function show(sec){
+document.getElementById("dashboard").classList.add("hidden");
+document.getElementById("prediction").classList.add("hidden");
+document.getElementById("analytics").classList.add("hidden");
+
+document.getElementById(sec).classList.remove("hidden");
+
+if(sec==="analytics") loadAnalytics();
+}
+
+let map={}, selectedCity="", chart, barChart, lineChart;
+
+fetch("/locations").then(r=>r.json()).then(d=>{
+d.locations.forEach(l=>{
+const [c,...a]=l.split("_");
+if(!map[c]) map[c]=[];
+map[c].push(a.join("_"));
+});
+createCities();
+});
+
+function createCities(){
+const el=document.getElementById("cities");
+el.innerHTML="";
+Object.keys(map).forEach(c=>{
+let d=document.createElement("div");
+d.className="glass p-4 text-center cursor-pointer";
+d.innerText=c;
+d.onclick=()=>selectCity(c,d);
+el.appendChild(d);
+});
+}
+
+function selectCity(c,el){
+selectedCity=c;
+
+document.querySelectorAll("#cities div").forEach(x=>x.classList.remove("active"));
+el.classList.add("active");
+
+document.getElementById("areas").classList.remove("hidden");
+
+const areas=document.getElementById("areas");
+areas.innerHTML="";
+
+map[c].forEach(a=>{
+let d=document.createElement("div");
+d.className="glass p-3 text-center cursor-pointer";
+d.innerText=a;
+d.onclick=()=>predict(c,a);
+areas.appendChild(d);
+});
+}
+
+function predict(city,area){
+fetch("/predict",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({city,area})
+})
+.then(r=>r.json())
+.then(d=>{
+document.getElementById("result").classList.remove("hidden");
+
+animate(d.predicted_demand);
+
+if(d.predicted_demand>70) level.innerText="🔥 High";
+else if(d.predicted_demand>40) level.innerText="⚖ Medium";
+else level.innerText="📉 Low";
+
+if(chart) chart.destroy();
+
+chart=new Chart(chartCanvas,{
+type:"line",
+data:{
+labels:[...Array(24).keys()],
+datasets:[{
+label:"Demand",
+data:Array.from({length:24},()=>Math.random()*100),
+borderColor:"#a855f7",
+backgroundColor:"rgba(168,85,247,0.2)"
+}]
+},
+options:{responsive:true, maintainAspectRatio:false}
+});
+});
+}
+
+function animate(val){
+let i=0;
+const int=setInterval(()=>{
+i+=val/20;
+if(i>=val){i=val;clearInterval(int);}
+value.innerText=Math.floor(i);
+},30);
+}
+
+function loadAnalytics(){
+
+const pieChart=new Chart(pie,{
+type:"pie",
+data:{
+labels:["Pune","Mumbai","Nagpur","Amravati"],
+datasets:[{
+data:[40,30,20,10],
+backgroundColor:["#a855f7","#6366f1","#ec4899","#8b5cf6"]
+}]
+}
+});
+
+barChart=new Chart(bar,{
+type:"bar",
+data:{
+labels:["Area1","Area2","Area3","Area4"],
+datasets:[{
+label:"Demand",
+data:[80,60,40,50],
+backgroundColor:"#a855f7"
+}]
+},
+options:{responsive:true}
+});
+
+lineChart=new Chart(line,{
+type:"line",
+data:{
+labels:[...Array(24).keys()],
+datasets:[{
+label:"Demand",
+data:Array.from({length:24},()=>Math.random()*100),
+borderColor:"#a855f7"
+}]
+},
+options:{responsive:true}
+});
+
+pie.onclick=function(evt){
+const points=pieChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true);
+
+if(points.length){
+const index=points[0].index;
+const city=pieChart.data.labels[index];
+updateCityCharts(city);
+}
+}
+}
+
+function updateCityCharts(city){
+
+const dataMap={
+Pune:[80,60,40,50],
+Mumbai:[90,70,60,55],
+Nagpur:[50,40,30,35],
+Amravati:[30,20,25,15]
 };
 
-async function loadLocations() {
-  const res = await fetch("/locations");
-  const data = await res.json();
+barChart.data.datasets[0].data=dataMap[city];
+barChart.update();
 
-  data.locations.forEach(loc => {
-    const [city, ...areaParts] = loc.split("_");
-    const area = areaParts.join("_");
-
-    if (!locationsMap[city]) locationsMap[city] = [];
-    locationsMap[city].push(area);
-  });
-
-  populateCities();
+lineChart.data.datasets[0].data=
+Array.from({length:24},()=>Math.random()*100);
+lineChart.update();
 }
 
-function populateCities() {
-  const citySelect = document.getElementById("citySelect");
-  citySelect.innerHTML = "";
+new Chart(dashChart,{
+type:"line",
+data:{
+labels:[...Array(24).keys()],
+datasets:[{
+label:"Demand",
+data:Array.from({length:24},()=>Math.random()*100),
+borderColor:"#a855f7"
+}]
+},
+options:{responsive:true, maintainAspectRatio:false}
+});
 
-  Object.keys(locationsMap).forEach(city => {
-    const opt = document.createElement("option");
-    opt.value = city;
-    opt.textContent = city;
-    citySelect.appendChild(opt);
-  });
-
-  populateAreas();
-}
-
-function populateAreas() {
-  const city = document.getElementById("citySelect").value;
-  const areaSelect = document.getElementById("areaSelect");
-  areaSelect.innerHTML = "";
-
-  locationsMap[city].forEach(area => {
-    const opt = document.createElement("option");
-    opt.value = area;
-    opt.textContent = area;
-    areaSelect.appendChild(opt);
-  });
-
-  applyTheme(city);
-}
-
-function applyTheme(city) {
-  const color = cityThemes[city] || "indigo";
-  document.getElementById("demandValue").className =
-    "text-4xl font-bold mt-1 text-" + color + "-600";
-}
-
-document.getElementById("citySelect").addEventListener("change", populateAreas);
-
-function animateNumber(finalValue) {
-  let start = 0;
-  const duration = 800;
-  const stepTime = 20;
-  const increment = finalValue / (duration / stepTime);
-
-  const counter = setInterval(() => {
-    start += increment;
-    if (start >= finalValue) {
-      start = finalValue;
-      clearInterval(counter);
-    }
-    document.getElementById("demandValue").innerText =
-      Math.floor(start) + " rides";
-  }, stepTime);
-}
-
-function setDemandLevel(value) {
-  const el = document.getElementById("demandLevel");
-
-  if (value > 70) {
-    el.innerText = "🔥 High Demand";
-    el.className = "text-red-600 font-semibold";
-  } else if (value > 40) {
-    el.innerText = "⚖ Medium Demand";
-    el.className = "text-yellow-600 font-semibold";
-  } else {
-    el.innerText = "📉 Low Demand";
-    el.className = "text-green-600 font-semibold";
-  }
-}
-
-function drawChart(baseValue) {
-  const ctx = document.getElementById("trendChart");
-
-  const data = Array.from({length: 24}, (_, i) =>
-    Math.round(baseValue + Math.sin(i/3) * 5 + Math.random() * 3)
-  );
-
-  if (chart) chart.destroy();
-
-  chart = new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: Array.from({length: 24}, (_, i) => i + ":00"),
-      datasets: [{
-        data: data,
-        tension: 0.4,
-        borderWidth: 3,
-        fill: true,
-        pointRadius: 4,
-        pointHoverRadius: 7
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-
-        tooltip: {
-          backgroundColor: "rgba(17,24,39,0.95)",   // dark premium bg
-          titleColor: "#fff",
-          bodyColor: "#fff",
-          padding: 12,
-          cornerRadius: 12,
-          displayColors: false,
-          callbacks: {
-            title: function(context) {
-              return "🕒 Hour: " + context[0].label;
-            },
-            label: function(context) {
-              return "🚕 Demand: " + context.parsed.y + " rides";
-            }
-          }
-        }
-      },
-
-      scales: {
-        x: { display: false },
-        y: { display: false }
-      }
-    }
-  });
-}
-
-async function predictDemand() {
-  const city = document.getElementById("citySelect").value;
-  const area = document.getElementById("areaSelect").value;
-
-  const resultDiv = document.getElementById("result");
-  const timeValue = document.getElementById("timeValue");
-  const loadingText = document.getElementById("loadingText");
-
-  resultDiv.classList.add("hidden");
-  loadingText.classList.remove("hidden");
-
-  const res = await fetch("/predict", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ city, area, base_fare: 100 })
-  });
-
-  const data = await res.json();
-
-  loadingText.classList.add("hidden");
-  resultDiv.classList.remove("hidden");
-
-  if (data.predicted_demand !== undefined) {
-    animateNumber(data.predicted_demand);
-    setDemandLevel(data.predicted_demand);
-    drawChart(data.predicted_demand);
-    timeValue.innerText = "As of: " + data.time;
-  }
-}
-
-loadLocations();
 </script>
 
 </body>
