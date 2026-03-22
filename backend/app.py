@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, Response
 import pickle
 from pathlib import Path
 import pandas as pd
@@ -6,8 +6,10 @@ import numpy as np
 from datetime import datetime
 import threading
 import logging
+from prometheus_client import Counter, generate_latest
 
 # ---------------- CONFIG ----------------
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = BASE_DIR / "models"
 DATA_DIR = BASE_DIR / "data" / "processed"
@@ -17,7 +19,10 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+REQUEST_COUNT = Counter('request_count', 'Total API Requests')
+
 # ---------------- GLOBALS ----------------
+
 encoder = None
 xgb_model = None
 scaler = None
@@ -28,9 +33,9 @@ load_lock = threading.Lock()
 predict_lock = threading.Lock()
 
 # ---------------- LOADERS ----------------
+
 def init_artifacts():
     global encoder, xgb_model, scaler, lstm_model, X_train
-
     with load_lock:
         if encoder is None:
             with open(DATA_DIR / "label_encoder.pkl", "rb") as f:
@@ -64,6 +69,7 @@ def init_artifacts():
                 logger.warning("⚠️ LSTM disabled: %s", e)
 
 # ---------------- HELPERS ----------------
+
 def get_lstm_sequence(location_encoded, ts):
     location_data = X_train[X_train["location"] == location_encoded]
 
@@ -84,11 +90,12 @@ def get_lstm_sequence(location_encoded, ts):
 
     return np.expand_dims(seq_scaled, axis=0)
 
+
 # ---------------- PREDICTION ----------------
+
 def predict_demand(city, area, base_fare=100):
     init_artifacts()
     ts = datetime.now()
-
     location = f"{city}_{area}"
 
     try:
@@ -115,7 +122,6 @@ def predict_demand(city, area, base_fare=100):
             logger.warning("⚠️ LSTM predict failed: %s", e)
 
     input_row["lstm_pred"] = lstm_pred
-
     expected_cols = list(X_train.columns) + ["lstm_pred"]
     input_row = input_row.reindex(columns=expected_cols, fill_value=0).astype(float)
 
@@ -125,6 +131,7 @@ def predict_demand(city, area, base_fare=100):
     return int(round(max(0, demand))), ts
 
 # ---------------- ROUTES ----------------
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -136,11 +143,11 @@ def locations():
 
 @app.route("/predict", methods=["POST"])
 def predict():
+    REQUEST_COUNT.inc()
     data = request.json or {}
     city = data.get("city")
     area = data.get("area")
     base_fare = data.get("base_fare", 100)
-
     if not city or not area:
         return jsonify({"error": "City and Area are required"}), 400
 
@@ -155,6 +162,10 @@ def predict():
     except Exception:
         logger.exception("Prediction failed")
         return jsonify({"error": "Prediction failed"}), 500
+
+@app.route("/metrics")
+def metrics():
+    return Response(generate_latest(), mimetype="text/plain")
 
 @app.route("/health")
 def health():
