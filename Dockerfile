@@ -20,6 +20,6 @@ RUN python data/generate_dataset.py && \
     python src/preprocess.py && \
     python src/train_model.py
 
-EXPOSE 5000
+EXPOSE $PORT
 
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "backend.app:app"]
+CMD ["sh", "-c", "gunicorn -w 2 -b 0.0.0.0:$PORT backend.app:app"]
