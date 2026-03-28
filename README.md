@@ -192,4 +192,3 @@ pytest src/tests/ -v
 Final-year B.E. in AI & Data Science | DevOps & Java Developer
 
 
-This project is licensed under the MIT License.
